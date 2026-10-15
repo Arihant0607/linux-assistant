@@ -1,7 +1,7 @@
 import subprocess
 from pathlib import Path
 import os
-
+import shutil
 
 def main():
     print("👋 Hey! I'm meru \n What can i do for you?")
@@ -10,25 +10,51 @@ def main():
         if parser(input("> ").strip().lower()) == False:
             break
         
+def get_intent(line):
+    opening = ["open", "launch", "start", "run"]
+    closing = ["close", "quit", "exit", "stop", "kill"]
+    listing = ["list" , "show" , "ls"]
+    navigation = ["cd", "go", "enter", "navigate"]
+    create = ["create", "make", "new", "generate", "add"]
+    rename = ["rename", "ren", "retitle", "relabel"]
+    copy = ["copy" , "duplicate" , "clone" ]
+    miscellaneous = ["change"]
+
+    words = line.split()
+    for word in (words):
+        if word in opening:
+            return "open"
+        elif word in closing:
+            return "close"
+        elif word in listing:
+            return "list"
+        elif word in navigation:
+            return "navigate"
+        elif word in create:
+            return "create"
+        elif word in rename:
+            return "rename"
+        elif word in copy:
+            return "copy"
+
 def parser(line):
-    # Removes puctuations from given input -> if any 
-    punctuations = ["!", "@", "#", "&", "(", ")", ":", "`", ";", "|" ,"?"]
+    # Removes puctuations from given input -> if any
+    punctuations = ["!", "@", "#", "&", "(", ")", ":", "`", ";", "|", "?"]
     for punctuation in punctuations:
         line = line.replace(punctuation, " ")
     # Removes common filler from givven input
     filler_words = [
-        "a", "an", "the", "please", "kindly", "can", "you", "could", "would", "i", "want", "to", "bro" , "hey"
+        "a", "an", "the", "please", "kindly", "can", "you", "could", "would", "i", "want", "bro", "hey"
     ]
-    formated_input =[]
+    formated_input = []
     line = line.split()
 
     for i in line:
         if i not in filler_words:
             formated_input.append(i)
-    
-    
+
     line = (" ").join(formated_input)
-    
+
     if "and" in line:
         line1, line2 = line.split("and", 1)
         if parser(line1.strip()) == False:
@@ -39,35 +65,38 @@ def parser(line):
 
     if line == "exit" or line == "quit" or line == "stop":
         return False
+    
+    intent = get_intent(line)
 
-    opening = ["open", "launch", "start", "run"]
-    closing = ["close", "quit", "exit", "stop", "kill"]
-    listing = ["list" , "show" , "ls"]
-    navigation = ["cd", "go", "enter", "navigate"]
-    create = ["create", "make", "new", "generate", "add"]
-    rename = ["rename", "ren", "retitle", "relabel"]
-    miscellaneous = ["change"]
 
-    words = line.split()
-    for i,word in enumerate(words):
-        if word in opening:
+    if intent is None:
+        print("command not found")
+        return
+    
+    if intent == "open":
             try:
-                _, app = line.split(" " , 1)
-                command("open" , app)
+                _, app = line.split(" ", 1)
+                if not app.strip():
+                    print("please enter an app to open")
+                else:
+                    command("open", app)
             except ValueError:
                 print("can't open")
                 pass
-        elif word in closing:
+    elif intent == "close":
             try:
                 _ , app = line.split(" ", 1)
-                command("close" , app)
+                if not app.strip():
+                    print("please enter an app to close")
+                else:
+                    command("close" , app)
             except ValueError:
                 print("can't close")
                 pass
-        elif word in listing:
+    elif intent == "list":
             l = []
             remove_filler = ["file" , "files" , "in"]
-            for _ in words:
+            for _ in line.split():
                 if _ not in remove_filler:
                     l.append(_) 
             try:
@@ -75,8 +104,8 @@ def parser(line):
             except IndexError:
                 command("list")
                 pass
-        elif word in navigation:
-            if "to" in words:
+    elif intent == "navigate":
+            if "to" in line.split():
                 try:
                     _ , directory = line.split("to", 1)
                     command("cd", directory)
@@ -90,11 +119,11 @@ def parser(line):
                 except ValueError:
                     print("please provide a directory")
                     pass
-        elif word in create:
+    elif intent == "create":
             directory_words = ["directory","dir", "folder" , "mkdir"]
             plural = ["directories" , "folders"]
             
-            if "in" in words:
+            if "in" in line.split():
                 name , dest = line.rsplit("in", 1 )
                 if not dest.strip():
                     print("please provide destination")
@@ -107,8 +136,8 @@ def parser(line):
                             _, name1 = name.split(_ , 1)
                             command("create_file" , name1 , dest)
 
-            elif "in" not in words:
-                for _ in words:
+            elif "in" not in line.split():
+                for _ in line.split():
                     if _ in directory_words :
                         _ , name = line.split(_)
                         if not name.strip():
@@ -121,10 +150,10 @@ def parser(line):
                             print("please enter file name")
                         else:
                             command("create_file" , name)
-        elif word in rename:
+    elif intent == "rename":
             directory_words = ["directory", "dir", "folder", "mkdir"]
             
-            if "to" in words:
+            if "to" in line.split():
                 phrase , new_name = line.rsplit("to" , 1)
 
                 if not new_name.strip():
@@ -137,7 +166,31 @@ def parser(line):
                         elif "file" == _ :
                             _ , old_name = phrase.split(_ ,1)
                             command("ren_file" , old_name , new_name)
+    elif intent == "copy":
+            source_words = ["of" , "from"]
+            destination_words = ["to" , "into" , "in" , "inside"]
 
+            for _ in line.split():
+                if _ in source_words:
+                    src = line.split(_)[1].strip()
+                    for sep in src.split():
+                        if sep in destination_words:
+                            src , dst = src.split(sep)
+                            if not src.split():
+                                print("source file is not provided")
+                            elif not dst.split():
+                                print("destination is not provided")
+                            else:
+                                command(src , dst)
+                else:
+                    if _ in destination_words:
+                        src , dst = line.split(_)
+                        if not src.strip():
+                            print("source file is not provided")
+                        elif not dst.split():
+                            print("destination is not provided")
+                        else:
+                            command(src, dst)
 
 def command(intent , target = "" , name = "" ):
     match intent:
@@ -159,8 +212,8 @@ def command(intent , target = "" , name = "" ):
             ren_dir(target , name)
         case "ren_file":
             ren_file(target , name)
-
-        
+  
+  
 def open_app(app ):
     try:
         subprocess.Popen([app] , stdout= subprocess.DEVNULL , stderr = subprocess.DEVNULL)
@@ -437,6 +490,8 @@ def create_file(name , dest):
                 print(f"I don't have permission to access {dest}")
 
 def ren_dir(old_name , new_name):
+    old_name = old_name.strip()
+    new_name = new_name.strip()
     p = Path(old_name)
     if p.exists() and p.is_dir():
             target = Path(new_name)
@@ -456,23 +511,26 @@ def ren_dir(old_name , new_name):
         print(f"No folder {old_name} exists")
 
 def ren_file(old_name , new_name):
+    old_name = old_name.strip()
+    new_name = new_name.strip()
     p = Path(old_name)
     if p.exists() and p.is_file():
             target = Path(new_name)
             if target.exists():
                 if target.is_dir():
-                    print(f"A folder with {new_name} exists")
+                    print(f"A file with {new_name} exists")
                 else:
                     print(f"A file with {new_name} exists")
             else:
                 try:
                     p.rename(target)
-                    print(f"{old_name} Folder renamed to {new_name}")
+                    print(f"{old_name} file renamed to {new_name}")
                 except PermissionError:
                     print("I don't have permission to do that")
                     pass
     else:
         print(f"No file {old_name} exists")
+
 
 
 if __name__ == "__main__":
