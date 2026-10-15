@@ -120,7 +120,7 @@ def parser(line):
                     print("please provide a directory")
                     pass
     elif intent == "create":
-            directory_words = ["directory","dir", "folder" , "mkdir"]
+            directory_words = ["directory","dir", "folder"]
             plural = ["directories" , "folders"]
             
             if "in" in line.split():
@@ -131,10 +131,10 @@ def parser(line):
                     for _ in name.split():
                         if _ in directory_words:
                             _, name1 = name.split(_ , 1)
-                            command("create_dir", name1, dest)
+                            command("create", name1, "folder" , dest)
                         elif _ == "file":
                             _, name1 = name.split(_ , 1)
-                            command("create_file" , name1 , dest)
+                            command("create" , name1 , "file" , dest)
 
             elif "in" not in line.split():
                 for _ in line.split():
@@ -143,15 +143,15 @@ def parser(line):
                         if not name.strip():
                             print("please enter folder name")
                         else:
-                            command("create_dir" , name)
+                            command("create" , name , "folder" , "")
                     elif _ == "file":
                         _ , name = line.split(_)
                         if not name.strip():
                             print("please enter file name")
                         else:
-                            command("create_file" , name)
+                            command("create" , name , "file" , "" )
     elif intent == "rename":
-            directory_words = ["directory", "dir", "folder", "mkdir"]
+            directory_words = ["directory", "dir", "folder"]
             
             if "to" in line.split():
                 phrase , new_name = line.rsplit("to" , 1)
@@ -162,10 +162,23 @@ def parser(line):
                     for _ in phrase.split():
                         if _ in directory_words:
                             _ , old_name = phrase.split(_ ,1)
-                            command("ren_dir" , old_name , new_name)
+                            if not old_name.strip():
+                                print("please provide a file/folder to rename")
+                            command("rename" , old_name , new_name)
+                            break
                         elif "file" == _ :
                             _ , old_name = phrase.split(_ ,1)
-                            command("ren_file" , old_name , new_name)
+                            if not old_name.strip():
+                                print("please provide a file/folder to rename")
+                            command("rename" , old_name , new_name)
+                            break
+                    else:
+                        try:
+                            old_name = phrase.split()[1]
+                            command("rename", old_name, new_name)
+                        except IndexError:
+                            print("please provide a file/folder to rename")
+                            pass                      
     elif intent == "copy":
             source_words = ["of" , "from"]
             destination_words = ["to" , "into" , "in" , "inside"]
@@ -181,7 +194,7 @@ def parser(line):
                             elif not dst.split():
                                 print("destination is not provided")
                             else:
-                                command(src , dst)
+                                command("copy" ,src , dst)
                 else:
                     if _ in destination_words:
                         src , dst = line.split(_)
@@ -190,9 +203,9 @@ def parser(line):
                         elif not dst.split():
                             print("destination is not provided")
                         else:
-                            command(src, dst)
+                            command("copy", src, dst)
 
-def command(intent , target = "" , name = "" ):
+def command(intent , target = None , work = None , kind = None):
     match intent:
         case _ if "dont" in intent:
             pass
@@ -204,16 +217,14 @@ def command(intent , target = "" , name = "" ):
             check_folder(target)
         case "cd":
             change_directory(target)
-        case "create_dir":
-            create_dir(target , name)
-        case "create_file":
-            create_file(target , name)
-        case "ren_dir":
-            ren_dir(target , name)
-        case "ren_file":
-            ren_file(target , name)
+        case "create":
+            create(target , work , kind)
+        case "rename":
+            rename(target , work)
+        case "copy":
+            copy(target , work)
   
-  
+
 def open_app(app ):
     try:
         subprocess.Popen([app] , stdout= subprocess.DEVNULL , stderr = subprocess.DEVNULL)
@@ -347,7 +358,7 @@ def change_directory(target):
                 print("I don't have permission to open that")
                 pass
 
-def create_dir(name ,dest):
+def create(name , kind , dst ):
     directories = {
         "~": "/home/arihant",
         "document": "Documents",
@@ -361,176 +372,133 @@ def create_dir(name ,dest):
         "video": "Videos",
         "videos": "Videos"
     }
-
-    dest = directories.get(dest.strip(), dest.strip())
-
+    dst = directories.get(dst.strip(), dst.strip())
+    target = Path(name.strip())
     
-    if not dest:
+    if not dst:
         try:
-            Path(name.strip()).mkdir()
-            print(f"created a folder {name} at {Path().cwd()}")
-        except FileExistsError:
-            print(f"folder {name} already exists")
-            pass
+            if kind == "file" :
+                if target.exists() and target.is_file():
+                    print(f"file {name.strip()} exists")
+                    return
+                else:
+                    target.touch()
+                    print(f"created {name.strip()} at {Path().cwd()}")
+            
+            elif kind == "folder":
+                if target.exists() and target.is_dir():
+                    print(f"folder {name.strip()} exists")
+                    return
+                else:
+                    target.mkdir()
+                    print(f"created {name.strip()} at {Path().cwd()}")
         except PermissionError:
-            print(f"I don't have permission to access {dest}")
-    elif "/" in dest.strip():
-        p = Path(correct_path(dest))/name.strip()
-        try:
-            p.mkdir()
-            print(f"created a folder {name} at {dest}")
-        except FileExistsError:
-            print(f"folder {name} already exists")
+            print("I don't have permission to do that")
             pass
-        except PermissionError:
-            print(f"I don't have permission to access {dest}")
-        
+    
+    elif "/" in dst:
+        p = Path(correct_path(dst))
+        if p.exists() and p.is_dir():
+            q = p / name.strip()
+            if q.exists():
+                if q.is_dir():
+                    print(f"folder with {name.strip()} already exists")
+                elif q.is_file():
+                    print(f"file with {name.strip()} already exists")
+            else:
+                try:
+                    if kind == "file":
+                        q.touch()
+                        print(f"created file {name.strip()} at {p}")
+                    
+                    elif kind == "folder":
+                        q.mkdir()
+                        print(f"created folder {name.strip()} at {p}")
+                except PermissionError:
+                    print(f"I don't have permission to access {p}")
+                    pass
+        else:
+            print(f"{dst} does not exists")
     else:
-        p = Path("/") / dest
+        p = Path("/") / dst
 
         if p.is_dir():
             q = p / name.strip()
-            try:
-                q.mkdir()
-                print(f"created a folder {name} at {p}")
-            except FileExistsError:
-                print(f"folder {name} already exists at {p}")
-                pass
-            except PermissionError:
-                print(f"I don't have permission to access {dest}")
-        else:
-            p = Path().home() / dest.strip()
-            q = p / name.strip()
-            try:
-                q.mkdir()
-                print(f"created a folder {name} at {p}")
-            except FileExistsError:
-                print(f"folder {name} already exists at {p}")
-                pass
-            except PermissionError:
-                print(f"I don't have permission to access {dest}")
-            
-def create_file(name , dest):
-    directories = {
-        "~": "/home/arihant",
-        "document": "Documents",
-        "documents": "Documents",
-        "desktop": "Desktop",
-        "download": "Downloads",
-        "downloads": "Downloads",
-        "picture": "Pictures",
-        "pictures": "Pictures",
-        "music": "Music",
-        "video": "Videos",
-        "videos": "Videos"
-    }
-
-    dest = directories.get(dest.strip(), dest.strip())
-
-    if not dest:
-        try:
-            if Path(name.strip()).exists(): 
-                if Path(name.strip()).is_file():
+            if q.exists():
+                if q.is_file():
                     print("file already Exists")
-                elif Path(name.strip()).is_dir():
+                elif q.is_dir():
                     print(f"folder with {name} exists")
             else:
-                Path(name.strip()).touch()
-                print(f"created a file {name} at {Path().cwd()}")
-            pass
-        except PermissionError:
-            print(f"I don't have permission to access {dest}")
-    elif "/" in dest.strip():
-        p = Path(correct_path(dest))
-        if p.exists() and p.is_dir():
-            try:
-                q = p / name.strip()
-                if q.exists(): 
-                    if q.is_file():
-                        print("file already Exists")
-                    elif q.is_dir():
-                        print(f"folder with {name} exists")
-                else:
-                    q.touch()
-                    print(f"created a file {name} at {dest}")
-            except PermissionError:
-                print(f"I don't have permission to access {dest}")
+                try:
+                    if kind == "file":
+                        q.touch()
+                        print(f"created file {name.strip()} at {p}")
+
+                    elif kind =="folder":
+                        q.mkdir()
+                        print(f"created folder {name.strip()} at {p}")
+                except PermissionError:
+                    print(f"I don't have permission to access {p}")
+                    pass
         else:
-            print(f"{dest} does not exists ")
-
-    else:
-        p = Path("/") / dest
-
-        if p.is_dir():
+            p = Path().home() / dst.strip()
             q = p / name.strip()
-            try:
-                if q.exists():
-                    if q.is_file():
-                        print("file already Exists")
-                    elif q.is_dir():
-                        print(f"folder with {name} exists")
-                else:
-                    q.touch()
-                    print(f"created a file {name} at {p}")
-            except PermissionError:
-                print(f"I don't have permission to access {dest}")
-        else:
-            p = Path().home() / dest.strip()
-            q = p / name.strip()
-            try:
-                if q.exists(): 
-                    if q.is_file():
-                        print("file already Exists")
-                    elif q.is_dir():
-                        print(f"folder with {name} exists")
-                else:
-                    q.touch()
-                    print(f"created a file {name} at {p}")
-            except PermissionError:
-                print(f"I don't have permission to access {dest}")
+            if q.exists():
+                if q.is_file():
+                    print("file already Exists")
+                elif q.is_dir():
+                    print(f"folder with {name} exists")
+            else:
+                try:
+                    if kind == "file":
+                        q.touch()
+                        print(f"created file {name.strip()} at {p}")
+                    elif kind == "folder":
+                        q.mkdir()
+                        print(f"created folder {name.strip()} at {p}")
+                except PermissionError:
+                    print(f"I don't have permission to access {p}")
+                    pass
 
-def ren_dir(old_name , new_name):
+def rename(old_name , new_name):
     old_name = old_name.strip()
     new_name = new_name.strip()
     p = Path(old_name)
-    if p.exists() and p.is_dir():
-            target = Path(new_name)
-            if target.exists():
-                if target.is_dir():
-                    print(f"A folder with {new_name} exists")
-                else:
-                    print(f"A file with {new_name} exists")
-            else:
+    target = Path(new_name)
+    if target.exists():
+        if target.is_dir():
+            print(f"A folder {new_name} exists")
+        else:
+            print(f"A file {new_name} exists")
+    else:
+        if p.exists():
+            if  p.is_dir():
                 try:
                     p.rename(target)
                     print(f"{old_name} Folder renamed to {new_name}")
                 except PermissionError:
                     print("I don't have permission to do that")
                     pass
-    else:
-        print(f"No folder {old_name} exists")
-
-def ren_file(old_name , new_name):
-    old_name = old_name.strip()
-    new_name = new_name.strip()
-    p = Path(old_name)
-    if p.exists() and p.is_file():
-            target = Path(new_name)
-            if target.exists():
-                if target.is_dir():
-                    print(f"A file with {new_name} exists")
-                else:
-                    print(f"A file with {new_name} exists")
-            else:
+            elif p.is_file():
                 try:
                     p.rename(target)
                     print(f"{old_name} file renamed to {new_name}")
                 except PermissionError:
                     print("I don't have permission to do that")
                     pass
-    else:
-        print(f"No file {old_name} exists")
+        else:
+            print(f"No file/folder with {old_name} name exists")
 
+def copy(src ,dst):
+    src = src.strip()
+    dst = dst.strip()
+
+    if src.exists():
+        if src.is_dir():
+            print("source should be a file")
+        elif src.is_file():
+            print()
 
 
 if __name__ == "__main__":
